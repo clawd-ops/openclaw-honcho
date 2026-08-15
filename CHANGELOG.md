@@ -7,6 +7,9 @@ All notable changes to `@honcho-ai/openclaw-honcho` will be documented in this f
 ### Added
 - **Canonical peer mapping**: add optional `canonicalPeerMap` config to alias legacy/fallback participant peer IDs such as `owner` to an explicit canonical peer like `rob` before peer creation, capture routing, session lookup, and participant checks.
 
+### Fixed
+- **Canonical fallback capture**: register the canonical owner peer with each Honcho session so senderless fallback messages are saved under a peer that is actually observing the session.
+
 ## [1.5.3] - 2026-07-30
 
 ### Fixed

@@ -6,11 +6,11 @@ describe("honchoConfigSchema", () => {
     expect(honchoConfigSchema.parse({}).canonicalPeerMap).toEqual({});
   });
 
-  it("parses non-empty canonical peer mappings", () => {
+  it("parses and trims non-empty canonical peer mappings", () => {
     expect(
       honchoConfigSchema.parse({
         canonicalPeerMap: {
-          owner: "rob",
+          " owner ": " rob ",
           "uuid_d7a458ea-bf8f-4831-8030-d80bd4529cb4": "rob",
         },
       }).canonicalPeerMap,
@@ -20,7 +20,7 @@ describe("honchoConfigSchema", () => {
     });
   });
 
-  it("ignores invalid canonical peer map entries", () => {
+  it("ignores empty or non-string canonical peer map entries", () => {
     expect(
       honchoConfigSchema.parse({
         canonicalPeerMap: {
@@ -30,5 +30,15 @@ describe("honchoConfigSchema", () => {
         },
       }).canonicalPeerMap,
     ).toEqual({ owner: "rob" });
+  });
+
+  it("rejects invalid canonical peer IDs", () => {
+    expect(() =>
+      honchoConfigSchema.parse({
+        canonicalPeerMap: {
+          owner: "not valid",
+        },
+      }),
+    ).toThrow(/Invalid canonicalPeerMap entry/);
   });
 });
