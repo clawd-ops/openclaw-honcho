@@ -9,6 +9,7 @@ import {
   loadPeersFileSync,
   resolvePeersFilePath,
   resolveParticipantPeerId,
+  canonicalizePeerId,
 } from "../peers.js";
 
 async function mktmp(): Promise<string> {
@@ -150,6 +151,17 @@ describe("resolveParticipantPeerId", () => {
     const id = resolveParticipantPeerId(long, p);
     expect(id.length).toBeLessThanOrEqual(100);
     expect(/^[a-zA-Z0-9_-]+$/.test(id)).toBe(true);
+  });
+});
+
+describe("canonicalizePeerId", () => {
+  it("maps legacy peer IDs to canonical peers", () => {
+    expect(canonicalizePeerId("owner", { owner: "rob" })).toBe("rob");
+    expect(canonicalizePeerId("uuid-legacy", { "uuid-legacy": "rob" })).toBe("rob");
+  });
+
+  it("leaves unmapped peer IDs unchanged", () => {
+    expect(canonicalizePeerId("ash", { owner: "rob" })).toBe("ash");
   });
 });
 

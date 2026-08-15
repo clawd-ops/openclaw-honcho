@@ -61,6 +61,11 @@
         "type": "boolean",
         "default": true,
         "description": "Default scope for memory_search. When true (default), results span every session the participant peer has written to. When false, results are scoped to the active session. Per-call override available via the memory_search `crossSession` parameter."
+      },
+      "canonicalPeerMap": {
+        "type": "object",
+        "additionalProperties": { "type": "string" },
+        "description": "Optional Honcho peer aliases applied before participant peer creation. Use to merge legacy IDs such as owner into a canonical peer like rob."
       }
     }
   },
@@ -106,6 +111,11 @@
       "label": "Cross-Session Search",
       "advanced": true,
       "help": "When enabled (default), memory tools can return results from any session in the workspace. Disable to scope results to the active session only."
+    },
+    "canonicalPeerMap": {
+      "label": "Canonical Peer Map",
+      "advanced": true,
+      "help": "Optional peer alias map, for example {\"owner\":\"rob\"}, used before creating or resolving participant peers."
     }
   }
 }

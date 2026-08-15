@@ -18,6 +18,7 @@ export type HonchoConfig = {
   disableDefaultNoisePatterns: boolean;
   ownerObserveOthers: boolean;
   crossSessionSearch: boolean;
+  canonicalPeerMap: Record<string, string>;
 };
 
 /**
@@ -56,6 +57,16 @@ export const honchoConfigSchema = {
     const noisePatterns = [
       ...new Set([...(disableDefaultNoisePatterns ? [] : DEFAULT_NOISE_PATTERNS), ...userPatterns]),
     ];
+    const canonicalPeerMap =
+      cfg.canonicalPeerMap && typeof cfg.canonicalPeerMap === "object" && !Array.isArray(cfg.canonicalPeerMap)
+        ? Object.fromEntries(
+            Object.entries(cfg.canonicalPeerMap as Record<string, unknown>)
+              .filter((entry): entry is [string, string] => {
+                const [source, target] = entry;
+                return source.length > 0 && typeof target === "string" && target.length > 0;
+              })
+          )
+        : {};
 
     return {
       apiKey,
@@ -81,6 +92,7 @@ export const honchoConfigSchema = {
       disableDefaultNoisePatterns,
       ownerObserveOthers: typeof cfg.ownerObserveOthers === "boolean" ? cfg.ownerObserveOthers : false,
       crossSessionSearch: typeof cfg.crossSessionSearch === "boolean" ? cfg.crossSessionSearch : true,
+      canonicalPeerMap,
     };
   },
 };

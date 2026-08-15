@@ -10,6 +10,7 @@ import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import { honchoConfigSchema, type HonchoConfig } from "./config.js";
 import {
   PeersPersister,
+  canonicalizePeerId,
   loadPeersFileSync,
   resolvePeersFilePath,
   resolveParticipantPeerId,
@@ -51,6 +52,8 @@ export type PluginState = {
   api: OpenClawPluginApi;
   ensureInitialized: () => Promise<void>;
   getAgentPeer: (agentId?: string) => Promise<Peer>;
+  getOwnerPeerId: () => string;
+  canonicalizeParticipantPeerId: (peerId: string) => string;
   /** Sender_id → Honcho peer_id map, backed by ~/.honcho/openclaw-peers.json.
    * Unknown senders are auto-seeded to OWNER_ID; the user hand-edits the file
    * to split specific senders off to their own peer IDs. */
@@ -106,6 +109,8 @@ export function createPluginState(api: OpenClawPluginApi): PluginState {
     peersPersister,
     ensureInitialized,
     getAgentPeer,
+    getOwnerPeerId,
+    canonicalizeParticipantPeerId,
     getParticipantPeer,
     resolveSessionParticipantPeer,
     isParticipantPeerId,
@@ -117,6 +122,17 @@ export function createPluginState(api: OpenClawPluginApi): PluginState {
     if (!Array.isArray(agents) || agents.length === 0) return "main";
     const defaultAgent = agents.find((a: { default?: boolean }) => a?.default) ?? agents[0];
     return (defaultAgent?.id ?? "main").toLowerCase().trim() || "main";
+  }
+
+  function canonicalizeParticipantPeerId(peerId: string): string {
+    const target = canonicalizePeerId(peerId, state.cfg.canonicalPeerMap);
+    if (!target || target === peerId) return peerId;
+    api.logger.debug?.(`[honcho] Canonicalized participant peer "${peerId}" -> "${target}"`);
+    return target;
+  }
+
+  function getOwnerPeerId(): string {
+    return canonicalizeParticipantPeerId(OWNER_ID);
   }
 
   async function ensureInitialized(): Promise<void> {
@@ -146,9 +162,12 @@ export function createPluginState(api: OpenClawPluginApi): PluginState {
       await honcho.setMetadata({ ...wsMeta, agentPeerMap: state.agentPeerMap });
     }
 
-    // Create default "owner" peer
-    const defaultPeer = await honcho.peer(OWNER_ID, { metadata: {} });
+    // Create default owner peer, optionally canonicalized for installs that
+    // merge legacy owner traffic into an explicit user peer such as "rob".
+    const ownerPeerId = getOwnerPeerId();
+    const defaultPeer = await honcho.peer(ownerPeerId, { metadata: {} });
     state.participantPeers.set(OWNER_ID, defaultPeer);
+    if (ownerPeerId !== OWNER_ID) state.participantPeers.set(ownerPeerId, defaultPeer);
 
     state.initialized = true;
   }
@@ -156,8 +175,10 @@ export function createPluginState(api: OpenClawPluginApi): PluginState {
   async function ensureOwnerPeer(): Promise<Peer> {
     let peer = state.participantPeers.get(OWNER_ID);
     if (peer) return peer;
-    peer = await honcho.peer(OWNER_ID, { metadata: {} });
+    const ownerPeerId = getOwnerPeerId();
+    peer = await honcho.peer(ownerPeerId, { metadata: {} });
     state.participantPeers.set(OWNER_ID, peer);
+    if (ownerPeerId !== OWNER_ID) state.participantPeers.set(ownerPeerId, peer);
     return peer;
   }
 
@@ -171,10 +192,13 @@ export function createPluginState(api: OpenClawPluginApi): PluginState {
     if (peer) return peer;
 
     const wasInFile = channelPeerId in peersPersister.peers;
-    const resolvedPeerId = resolveParticipantPeerId(channelPeerId, peersPersister, OWNER_ID);
-    const autoSeeded = !wasInFile && resolvedPeerId !== OWNER_ID;
+    const ownerPeerId = getOwnerPeerId();
+    const resolvedPeerId = canonicalizeParticipantPeerId(
+      resolveParticipantPeerId(channelPeerId, peersPersister, ownerPeerId),
+    );
+    const autoSeeded = !wasInFile && resolvedPeerId !== ownerPeerId;
 
-    if (resolvedPeerId === OWNER_ID) {
+    if (resolvedPeerId === ownerPeerId) {
       peer = await ensureOwnerPeer();
     } else {
       const metadata: Record<string, unknown> = { channelPeerId };
@@ -198,7 +222,7 @@ export function createPluginState(api: OpenClawPluginApi): PluginState {
   }
 
   function isParticipantPeerId(peerId: string): boolean {
-    if (peerId === OWNER_ID) return true;
+    if (peerId === OWNER_ID || peerId === getOwnerPeerId()) return true;
     // Check if this peer ID is a known participant peer
     for (const [, peer] of state.participantPeers) {
       if (peer.id === peerId) return true;

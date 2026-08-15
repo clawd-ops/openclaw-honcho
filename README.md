@@ -131,6 +131,26 @@ Map `sender_id` → Honcho peer ID in `~/.honcho/openclaw-peers.json` (override 
 - **Auto-seeded, manually overridable.** The plugin only adds entries for senders not already in the map.
 - **Adding a mapping after messages exist splits history.** Messages already stored under the original peer stay there; new messages land under the new peer. Remap before the peer accumulates history.
 
+For installs consolidating legacy data, set `canonicalPeerMap` in the plugin config to alias old fallback peer IDs before the plugin creates or resolves participant peers:
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclaw-honcho": {
+        "config": {
+          "canonicalPeerMap": {
+            "owner": "rob"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+This is different from the peers file: `peers` maps platform `sender_id`s to Honcho peers, while `canonicalPeerMap` maps Honcho peer IDs to the canonical peer that should receive future fallback/legacy traffic.
+
 ### Multi-Peer Participants
 
 In group chats (Discord, Slack, etc.), the plugin extracts the sender's platform ID from each inbound message and uses it directly as the Honcho peer ID. This gives every participant — humans and any other bots in the room — their own memory and representation in Honcho, rather than attributing all non-agent messages to a single generic peer.
