@@ -272,14 +272,19 @@ export function extractSenderId(content: string): string | undefined {
 
     try {
       const parsed = JSON.parse(jsonLines.join("\n"));
-      // Priority: top-level sender_id string → sender.id (object form emitted by
-      // OpenClaw and HA Assist envelopes) → sender string (legacy shape).
-      const candidate = parsed.sender_id ?? parsed.sender;
-      if (typeof candidate === "string" && candidate.length > 0) {
-        return candidate;
+      // Priority: top-level sender_id string → sender string (legacy shape) →
+      // sender.id (object form emitted by OpenClaw and HA Assist envelopes).
+      // Each path is type-guarded independently so a malformed higher-priority
+      // field does not block the lower-priority fallback.
+      if (typeof parsed.sender_id === "string" && parsed.sender_id.length > 0) {
+        return parsed.sender_id;
       }
-      if (candidate && typeof candidate === "object") {
-        const objId = (candidate as { id?: unknown }).id;
+      const sender = parsed.sender;
+      if (typeof sender === "string" && sender.length > 0) {
+        return sender;
+      }
+      if (sender && typeof sender === "object") {
+        const objId = (sender as { id?: unknown }).id;
         if (typeof objId === "string" && objId.length > 0) {
           return objId;
         }

@@ -314,4 +314,22 @@ describe("extractSenderId", () => {
 
     expect(extractSenderId(content)).toBeUndefined();
   });
+
+  it("falls back to sender.id when sender_id is a non-string value", () => {
+    const content = metadataBlock({
+      sender_id: 12345,
+      sender: { id: "fallback-sender" },
+    });
+
+    expect(extractSenderId(content)).toBe("fallback-sender");
+  });
+
+  it("falls back to sender string when sender_id is null", () => {
+    const content = metadataBlock({
+      sender_id: null,
+      sender: "U-legacy-string",
+    });
+
+    expect(extractSenderId(content)).toBe("U-legacy-string");
+  });
 });
