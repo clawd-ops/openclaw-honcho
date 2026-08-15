@@ -112,6 +112,11 @@ export function resolveParticipantPeerId(
   return seedPeerId;
 }
 
+export function canonicalizePeerId(peerId: string, canonicalPeerMap: Record<string, string>): string {
+  const target = canonicalPeerMap[peerId];
+  return target && target.length > 0 ? target : peerId;
+}
+
 export type PeersPersisterOptions = {
   /** Flush debounce window in milliseconds. Default 1000. */
   debounceMs?: number;
