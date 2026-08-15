@@ -269,4 +269,49 @@ describe("extractSenderId", () => {
     expect(extractSenderId("just a normal DM")).toBeUndefined();
     expect(extractSenderId("")).toBeUndefined();
   });
+
+  it("extracts sender.id from the object shape emitted by OpenClaw envelopes", () => {
+    const content = metadataBlock({
+      chat_id: "user:378376356108435457",
+      sender: { id: "378376356108435457", name: "bigrob8181", username: "bigrob8181" },
+    });
+
+    expect(extractSenderId(content)).toBe("378376356108435457");
+  });
+
+  it("extracts sender.id from HA Assist envelope object shape", () => {
+    const content = metadataBlock({
+      chat_id: "chat-ha-assist-clawd-abcd",
+      sender: { id: "ha-user-uuid-1234", name: "Rob", source: "ha_assist" },
+    });
+
+    expect(extractSenderId(content)).toBe("ha-user-uuid-1234");
+  });
+
+  it("prefers top-level sender_id string over sender.id object", () => {
+    const content = metadataBlock({
+      sender_id: "canonical-sender",
+      sender: { id: "object-sender" },
+    });
+
+    expect(extractSenderId(content)).toBe("canonical-sender");
+  });
+
+  it("returns undefined when sender is an object with no id", () => {
+    const content = metadataBlock({ sender: { name: "no-id-here" } });
+
+    expect(extractSenderId(content)).toBeUndefined();
+  });
+
+  it("returns undefined when sender.id is not a string", () => {
+    const content = metadataBlock({ sender: { id: 12345 } });
+
+    expect(extractSenderId(content)).toBeUndefined();
+  });
+
+  it("returns undefined when sender.id is an empty string", () => {
+    const content = metadataBlock({ sender: { id: "" } });
+
+    expect(extractSenderId(content)).toBeUndefined();
+  });
 });

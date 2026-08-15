@@ -272,10 +272,17 @@ export function extractSenderId(content: string): string | undefined {
 
     try {
       const parsed = JSON.parse(jsonLines.join("\n"));
-      // Try sender_id first, fall back to sender
-      const id = parsed.sender_id ?? parsed.sender;
-      if (typeof id === "string" && id.length > 0) {
-        return id;
+      // Priority: top-level sender_id string → sender.id (object form emitted by
+      // OpenClaw and HA Assist envelopes) → sender string (legacy shape).
+      const candidate = parsed.sender_id ?? parsed.sender;
+      if (typeof candidate === "string" && candidate.length > 0) {
+        return candidate;
+      }
+      if (candidate && typeof candidate === "object") {
+        const objId = (candidate as { id?: unknown }).id;
+        if (typeof objId === "string" && objId.length > 0) {
+          return objId;
+        }
       }
     } catch {
       // Malformed JSON — return undefined
