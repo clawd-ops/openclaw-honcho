@@ -21,6 +21,8 @@ export type HonchoConfig = {
   canonicalPeerMap: Record<string, string>;
 };
 
+const HONCHO_PEER_ID_RE = /^[A-Za-z0-9_-]{1,100}$/;
+
 /**
  * Resolve environment variable references in config values.
  * Supports ${ENV_VAR} syntax.
@@ -33,6 +35,25 @@ function resolveEnvVars(value: string): string {
     }
     return envValue;
   });
+}
+
+function parseCanonicalPeerMap(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+
+  const out: Record<string, string> = {};
+  for (const [rawSource, rawTarget] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof rawTarget !== "string") continue;
+    const source = rawSource.trim();
+    const target = rawTarget.trim();
+    if (!source || !target) continue;
+    if (!HONCHO_PEER_ID_RE.test(source) || !HONCHO_PEER_ID_RE.test(target)) {
+      throw new Error(
+        `Invalid canonicalPeerMap entry "${rawSource}": Honcho peer IDs must match ${HONCHO_PEER_ID_RE.source}`,
+      );
+    }
+    out[source] = target;
+  }
+  return out;
 }
 
 export const honchoConfigSchema = {
@@ -57,16 +78,7 @@ export const honchoConfigSchema = {
     const noisePatterns = [
       ...new Set([...(disableDefaultNoisePatterns ? [] : DEFAULT_NOISE_PATTERNS), ...userPatterns]),
     ];
-    const canonicalPeerMap =
-      cfg.canonicalPeerMap && typeof cfg.canonicalPeerMap === "object" && !Array.isArray(cfg.canonicalPeerMap)
-        ? Object.fromEntries(
-            Object.entries(cfg.canonicalPeerMap as Record<string, unknown>)
-              .filter((entry): entry is [string, string] => {
-                const [source, target] = entry;
-                return source.length > 0 && typeof target === "string" && target.length > 0;
-              })
-          )
-        : {};
+    const canonicalPeerMap = parseCanonicalPeerMap(cfg.canonicalPeerMap);
 
     return {
       apiKey,

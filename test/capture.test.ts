@@ -18,7 +18,7 @@ type SessionStub = {
   addMessages: ReturnType<typeof vi.fn>;
 };
 
-function createMockState(): { state: PluginState; session: SessionStub } {
+function createMockState({ ownerPeerId = "owner" }: { ownerPeerId?: string } = {}): { state: PluginState; session: SessionStub } {
   const session: SessionStub = {
     metadata: {},
     getMetadata: vi.fn(async () => session.metadata),
@@ -30,7 +30,7 @@ function createMockState(): { state: PluginState; session: SessionStub } {
   };
 
   const agentPeer = { id: "agent-main", message: vi.fn((text: string) => ({ text })) };
-  const ownerPeer = { id: "owner", message: vi.fn((text: string) => ({ text })) };
+  const ownerPeer = { id: ownerPeerId, message: vi.fn((text: string) => ({ text })) };
 
   const state = {
     cfg: {
@@ -39,6 +39,7 @@ function createMockState(): { state: PluginState; session: SessionStub } {
       crossSessionSearch: true,
       workspaceId: "openclaw",
       baseUrl: "https://api.honcho.dev",
+      canonicalPeerMap: ownerPeerId === "owner" ? {} : { owner: ownerPeerId },
     },
     honcho: {
       // Mirrors real Honcho SDK: passing `metadata` on session() REPLACES the
@@ -166,6 +167,27 @@ describe("flushMessages metadata", () => {
 
     expect(session.metadata).not.toHaveProperty("messageProvider");
     expect(session.metadata).not.toHaveProperty("lastSessionId");
+  });
+
+  it("registers the canonical owner peer for senderless fallback messages", async () => {
+    const { state, session } = createMockState({ ownerPeerId: "rob" });
+    const api = { logger: loggerStub() } as never;
+
+    await flushMessages(
+      api,
+      state,
+      [
+        { role: "user", content: "senderless fallback", timestamp: 1 },
+        { role: "assistant", content: "reply", timestamp: 2 },
+      ],
+      { sessionKey: "agent:main:webchat:direct", agentId: "main" },
+    );
+
+    expect(session.addPeers).toHaveBeenCalledWith([
+      ["rob", { observeMe: true, observeOthers: false }],
+      ["agent-main", { observeMe: true, observeOthers: true }],
+    ]);
+    expect(session.addMessages.mock.calls[0][0][0]).toEqual({ text: "senderless fallback" });
   });
 });
 

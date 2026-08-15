@@ -1,7 +1,6 @@
 // @ts-ignore - resolved by openclaw runtime
 import type { OpenClawPluginApi } from "openclaw/plugin-sdk";
 import type { PluginState } from "../state.js";
-import { OWNER_ID } from "../state.js";
 import {
   buildSessionKey,
   classifySession,
@@ -113,9 +112,9 @@ export async function flushMessages(
 
   // Build peer configs: default owner + all resolved participant peers + agent + parent
   const peerConfigMap = new Map<string, { observeMe: boolean; observeOthers: boolean }>();
-  peerConfigMap.set(OWNER_ID, { observeMe: true, observeOthers: state.cfg.ownerObserveOthers });
+  peerConfigMap.set(defaultParticipantPeer.id, { observeMe: true, observeOthers: state.cfg.ownerObserveOthers });
   for (const [, peer] of resolvedPeers) {
-    if (peer.id !== OWNER_ID) {
+    if (peer.id !== defaultParticipantPeer.id) {
       peerConfigMap.set(peer.id, { observeMe: true, observeOthers: state.cfg.ownerObserveOthers });
     }
   }
