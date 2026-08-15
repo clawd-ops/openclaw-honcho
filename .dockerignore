@@ -1,0 +1,12 @@
+.git
+.github
+node_modules
+dist
+coverage
+test
+*.log
+.DS_Store
+FORK.md
+README.md
+CHANGELOG.md
+CONTRIBUTING.md

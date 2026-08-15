@@ -1,0 +1,86 @@
+name: Build and Publish OCI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: build-and-publish-oci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test -- --run
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/clawd-ops/openclaw-honcho
+          tags: |
+            type=sha,format=long,prefix=
+            type=sha,prefix=
+            type=ref,event=branch
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test image contents
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          FIRST_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          mkdir -p /tmp/plugin-out
+          docker run --rm -v /tmp/plugin-out:/dest "$FIRST_TAG"
+          test -f /tmp/plugin-out/package.json
+          test -f /tmp/plugin-out/openclaw.plugin.json
+          test -f /tmp/plugin-out/install.js
+          test -f /tmp/plugin-out/dist/index.js
+          test -d /tmp/plugin-out/node_modules/@honcho-ai
+          test -d /tmp/plugin-out/node_modules/@sinclair
+          if [ -d /tmp/plugin-out/node_modules/openclaw ]; then
+            echo "ERROR: openclaw peer dep leaked into image node_modules" >&2
+            exit 1
+          fi
+          echo "Smoke test passed."
